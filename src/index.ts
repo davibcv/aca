@@ -1,16 +1,29 @@
-#!/usr/bin/env node
-
-import { runCycle } from './orchestrator';
+import { readConfig } from './config';
+import { runTask } from './runner';
 
 async function main() {
-  console.log('ACA agent scaffold - running a dry-cycle.');
-  try {
-    const summary = await runCycle({ dryRun: true });
-    console.log('Cycle summary:', summary);
-  } catch (err) {
-    console.error('Error during cycle:', err);
-    process.exit(1);
-  }
+  const config = readConfig();
+
+  const task = {
+    id: 'aca-task-01',
+    repo: 'davibcv/aca',
+    description: 'Phase 2 scaffold bootstrap',
+    branch: config.branch,
+    criteria: ['build', 'lint', 'test'],
+    maxAttempts: 3
+  };
+
+  const result = await runTask(task, config.repoRoot);
+
+  console.log(JSON.stringify({
+    taskId: result.task.task.id,
+    summary: result.summary,
+    applied: result.applied,
+    repoRoot: result.repoRoot
+  }, null, 2));
 }
 
-main();
+main().catch((error: unknown) => {
+  console.error('ACA bootstrap failed:', error);
+  process.exit(1);
+});
