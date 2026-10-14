@@ -1,31 +1,62 @@
-# Agente de Reparação de Aplicativos (ACA)
+# ACA
 
-Este repositório contém o agente controlador (orquestrador) cujo objetivo é analisar, corrigir e manter projetos de software de forma assistida por IA, com foco inicial no app "Fluent-Roleplay".
+Agente Corretor de Aplicativos (ACA) — scaffold Phase 2
 
-Objetivo desta etapa
+Este repositório contém um agente autónomo mínimo para gerar propostas de patchs para um repositório, aplicar alterações localmente e reportar resultados.
 
-- Fase 1: Conceção e estrutura. Não foram feitas modificações no projeto-alvo nesta etapa.
-- Criar documentação inicial, decisões e roteiro incremental para o desenvolvimento do sistema.
+Status: fase 2 — scaffold funcional (mock provider) com integração opcional Gemini.
 
-Estado atual do repositório
+Estrutura
+- `src/` — código fonte TypeScript
+- `src/providers/` — providers de AI (mock e Gemini)
+- `src/orchestrator.ts` — ciclo do agente
+- `src/workflow.ts` — executor do workflow (escreve relatório)
+- `src/runner.ts` — runner utilitário para execuções isoladas
+- `src/state.ts` — armazenamento simples de tasks em `.aca_state/tasks.json`
+- `tests/` — testes vitais (vitest)
 
-- Repositório privado criado por davibcv (id: 1418190464).
-- Antes desta alteração, o repositório estava vazio (tamanho 0).
+Quickstart (local)
+1. Clone o repositório e instale dependências:
 
-Arquivos principais
+   git clone https://github.com/davibcv/aca.git
+   cd aca
+   npm ci
 
-- ARCHITECTURE.md — proposta de arquitetura e justificativa.
-- ROADMAP.md — plano de desenvolvimento incremental com critérios objetivos de conclusão por etapa.
-- DECISIONS.md — decisões tomadas (ADR) e questões pendentes.
-- SECURITY.md — resumo dos requisitos e práticas de segurança iniciais.
-- NEXT_STEPS.md — próximos passos práticos para iniciar a implementação (ativação de CI, escolha de provedor AI, permissões).
-- .gitignore — arquivos e diretórios a ignorar.
+2. Run em modo dry-run (não aplica patches):
 
-Como retomar o trabalho
+   export ACA_DRY_RUN=1
+   npx ts-node src/index.ts
 
-1. Revise as decisões pendentes em DECISIONS.md e confirme provedor de IA preferido e políticas de execução (ex.: permitir GitHub Actions com secrets).
-2. Após a aprovação, implementaremos a Fase 2 (estrutura básica do código + CI) em branch separada e com testes automatizados.
+   # ou build e executar
+   npm run build
+   ACA_DRY_RUN=1 node dist/index.js
 
-Licença e contribuições
+3. Para usar o Gemini provider localmente (não partilhar a chave no chat):
 
-Este repositório ainda não inclui uma licença; adicione uma se desejar que colaboradores externos trabalhem no projeto.
+   export ACA_PROVIDER=gemini
+   export GEMINI_API="<sua_chave_aqui>"     # nome do secret esperado pelo projeto
+   # opcionalmente, se usar endpoint alternativo:
+   # export GEMINI_API_URL="https://..."
+
+   export ACA_DRY_RUN=1
+   npx ts-node src/index.ts
+
+Secrets e GitHub Actions
+- Regista o secret `GEMINI_API` em Settings → Secrets and variables → Actions para que os workflows possam aceder à chave sem expô-la no código.
+
+CI e Workflows
+- O repositório inclui um workflow de CI que executa `npm run ci` em pushes e PRs.
+- Tem também um workflow manual (`Run ACA workflow`) que permite disparar o agente (por defeito em dry-run). Sempre verifica `dry_run` antes de aplicar alterações num repositório remoto.
+
+Como funciona
+- `src/index.ts` é o ponto de entrada canonical: chama `runWorkflow`.
+- `runWorkflow` chama `runCycle` (orchestrator) que busca/gera tasks, pede uma `proposal` ao provider e aplica patches com `patcher` (quando houver).
+- Propostas são gravadas como relatórios em `.aca_reports/` (um ficheiro JSON por execução).
+
+Contribuição e roadmap
+- Integrar provider Gemini com prompts robustos e parsing tolerante.
+- Melhorar regras de segurança (validar patches antes de aplicar, testes automatizados, revisão humana opcional).
+- Adicionar testes end-to-end e integração com GitHub PR flow.
+
+Licença
+- UNLICENSED (ver package.json)
