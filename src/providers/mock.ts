@@ -1,18 +1,10 @@
-import { AIProvider } from './provider';
+import { AIProvider, Proposal } from './provider';
 
 export class MockProvider implements AIProvider {
-  async generateProposal(task: { id: string; description: string }): Promise<{
-    summary: string;
-    patches: Array<{ path: string; content: string }>;
-  }> {
+  async generateProposal(task: any): Promise<Proposal> {
     return {
-      summary: `Mock proposal for ${task.id}: ${task.description}`,
-      patches: [
-        {
-          path: 'README.md',
-          content: `# Mock patch\n\nThis is a sample generated output for task ${task.id}.\n`
-        }
-      ]
+      summary: `Mock proposal for ${task.id}`,
+      patches: []
     };
   }
 }

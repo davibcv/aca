@@ -1,21 +1,15 @@
-import { AIProvider } from './provider';
+import { AIProvider, Proposal } from './provider';
 
 export class GeminiProvider implements AIProvider {
-  constructor(private readonly apiKey: string) {}
+  constructor(private apiKey: string) {}
 
-  async generateProposal(task: { id: string; description: string }): Promise<{
-    summary: string;
-    patches: Array<{ path: string; content: string }>;
-  }> {
+  async generateProposal(task: any): Promise<Proposal> {
     if (!this.apiKey) {
-      return {
-        summary: `Gemini provider is not configured for ${task.id}.`,
-        patches: []
-      };
+      throw new Error('Missing Gemini API key');
     }
 
     return {
-      summary: `Gemini proposal for ${task.id}: ${task.description}`,
+      summary: `Gemini proposal for ${task.id}`,
       patches: []
     };
   }

@@ -1,6 +1,11 @@
-export interface AIProvider {
-  generateProposal(task: { id: string; description: string }): Promise<{
-    summary: string;
-    patches: Array<{ path: string; content: string }>;
+export type Proposal = {
+  summary: string;
+  patches: Array<{
+    path: string;
+    content: string;
   }>;
+};
+
+export interface AIProvider {
+  generateProposal(task: any): Promise<Proposal>;
 }
