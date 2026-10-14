@@ -1,31 +1,32 @@
-# Agente de Reparação de Aplicativos (ACA)
+# ACA
 
-Este repositório contém o agente controlador (orquestrador) cujo objetivo é analisar, corrigir e manter projetos de software de forma assistida por IA, com foco inicial no app "Fluent-Roleplay".
+Agente de Reparação de Aplicativos (ACA) — núcleo e infraestrutura inicial.
 
-Objetivo desta etapa
+## Objetivo
 
-- Fase 1: Conceção e estrutura. Não foram feitas modificações no projeto-alvo nesta etapa.
-- Criar documentação inicial, decisões e roteiro incremental para o desenvolvimento do sistema.
+Este repositório implementa a base operacional do agente de engenharia assistida por IA para:
+- receber tarefas de manutenção e desenvolvimento
+- avaliar um projeto-alvo
+- identificar problemas
+- executar verificações determinísticas
+- propor correções
+- validar mudanças em uma branch isolada
+- gerar relatórios e artefatos
 
-Estado atual do repositório
+## Fase atual
 
-- Repositório privado criado por davibcv (id: 1418190464).
-- Antes desta alteração, o repositório estava vazio (tamanho 0).
+A construção está em fase 2: base executável e integração contínua.
 
-Arquivos principais
+## Estrutura
 
-- ARCHITECTURE.md — proposta de arquitetura e justificativa.
-- ROADMAP.md — plano de desenvolvimento incremental com critérios objetivos de conclusão por etapa.
-- DECISIONS.md — decisões tomadas (ADR) e questões pendentes.
-- SECURITY.md — resumo dos requisitos e práticas de segurança iniciais.
-- NEXT_STEPS.md — próximos passos práticos para iniciar a implementação (ativação de CI, escolha de provedor AI, permissões).
-- .gitignore — arquivos e diretórios a ignorar.
+- `src/` — código do agente e tipos
+- `scripts/` — scripts de análise/patch
+- `.github/workflows/` — automação
+- `docs/` — documentação operacional
 
-Como retomar o trabalho
+## Observações de segurança
 
-1. Revise as decisões pendentes em DECISIONS.md e confirme provedor de IA preferido e políticas de execução (ex.: permitir GitHub Actions com secrets).
-2. Após a aprovação, implementaremos a Fase 2 (estrutura básica do código + CI) em branch separada e com testes automatizados.
-
-Licença e contribuições
-
-Este repositório ainda não inclui uma licença; adicione uma se desejar que colaboradores externos trabalhem no projeto.
+- Nunca gravar segredos no código-fonte.
+- Usar GitHub Actions Secrets para chaves de API e tokens.
+- O agente deve respeitar limites de execução, timeouts, tentativas e branch isolada.
+- A execução em repositórios-alvo deve ser controlada e não automática em branch principal.
