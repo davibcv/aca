@@ -1,0 +1,32 @@
+{
+  "name": "aca-agent",
+  "version": "0.1.0",
+  "description": "Agente de Repara\u00e7\u00e3o de Aplicativos - n\u00facleo (scaffold)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint 'src/**/*.{ts,tsx}' --max-warnings=0 || true",
+    "test": "vitest run",
+    "prepare": "",
+    "ci": "npm run typecheck && npm run lint && npm run test"
+  },
+  "keywords": [
+    "agent",
+    "automation",
+    "aca"
+  ],
+  "author": "davibcv",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "vitest": "^1.4.5",
+    "@types/node": "^20.3.1",
+    "eslint": "^8.49.0",
+    "@typescript-eslint/parser": "^6.5.0",
+    "@typescript-eslint/eslint-plugin": "^6.5.0",
+    "eslint-config-prettier": "^9.1.0",
+    "node-fetch": "^3.3.2"
+  }
+}
