@@ -1,3 +1,4 @@
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -65,8 +66,6 @@ describe('orchestrator read-only inspection', () => {
       })
     );
 
-    // O orquestrador não deve criar relatórios nem aplicar patches.
-    // A gravação do relatório pertence ao workflow.
     const rootEntries = await fs.readdir(tmpRoot);
 
     expect(rootEntries).not.toContain('.aca_reports');
