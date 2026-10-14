@@ -44,7 +44,7 @@ jobs:
           else
             npx ts-node src/index.ts
           fi
-      - name: Debug: list workspace and reports
+    name: "Debug: list workspace and reports"
         run: |
           echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
           pwd
