@@ -1,0 +1,38 @@
+name: Run ACA workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (do not apply patches)'
+        required: false
+        default: 'true'
+      provider:
+        description: 'Provider to use: mock or gemini'
+        required: false
+        default: 'mock'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: npm ci
+      - name: Run ACA workflow
+        env:
+          ACA_PROVIDER: ${{ github.event.inputs.provider }}
+          GEMINI_API: ${{ secrets.GEMINI_API }}
+          GEMINI_API_URL: ${{ secrets.GEMINI_API_URL }}
+          ACA_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: npx ts-node src/index.ts
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aca-reports
+          path: .aca_reports/**
