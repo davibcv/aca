@@ -13,7 +13,7 @@ Estrutura
 - `src/workflow.ts` — executor do workflow (escreve relatório)
 - `src/runner.ts` — runner utilitário para execuções isoladas
 - `src/state.ts` — armazenamento simples de tasks em `.aca_state/tasks.json`
-- `tests/` — testes vitais (vitest)
+- `tests/` — testes (vitest)
 
 Quickstart (local)
 1. Clone o repositório e instale dependências:
@@ -46,7 +46,7 @@ Secrets e GitHub Actions
 
 CI e Workflows
 - O repositório inclui um workflow de CI que executa `npm run ci` em pushes e PRs.
-- Tem também um workflow manual (`Run ACA workflow`) que permite disparar o agente (por defeito em dry-run). Sempre verifica `dry_run` antes de aplicar alterações num repositório remoto.
+- Há também um workflow manual (`Run ACA workflow`) que permite disparar o agente (por defeito em dry-run). Sempre verifica `dry_run` antes de aplicar alterações num repositório remoto.
 
 Como funciona
 - `src/index.ts` é o ponto de entrada canonical: chama `runWorkflow`.
