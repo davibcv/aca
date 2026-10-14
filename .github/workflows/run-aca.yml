@@ -1,62 +1,82 @@
+
 name: Run ACA workflow
 
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Run in dry-run mode (do not apply patches)'
+        description: "Run in dry-run mode (do not apply patches)"
         required: false
-        default: 'true'
+        type: boolean
+        default: true
       provider:
-        description: 'Provider to use: mock or gemini'
+        description: "Provider to use: mock or gemini"
         required: false
-        default: 'mock'
+        type: choice
+        options:
+          - mock
+          - gemini
+        default: mock
+
+permissions:
+  contents: read
 
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Install deps
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
         run: |
           if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
             npm ci
           else
             npm install
           fi
-      - name: Build (if project has build step)
+
+      - name: Build
         run: npm run build --if-present
-      - name: Run ACA workflow
+
+      - name: Run ACA
         env:
           REPORT_DIR: ${{ github.workspace }}/.aca_reports
-          ACA_PROVIDER: ${{ github.event.inputs.provider }}
-          GEMINI_API: ${{ secrets.GEMINI_API }}
+          ACA_PROVIDER: ${{ inputs.provider }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_URL: ${{ secrets.GEMINI_API_URL }}
-          ACA_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          ACA_DRY_RUN: ${{ inputs.dry_run }}
         run: |
           mkdir -p "$REPORT_DIR"
+
           if [ -f ./dist/index.js ]; then
             node ./dist/index.js
+          elif [ -f ./src/index.ts ]; then
+            npx --yes tsx src/index.ts
           else
-            npx ts-node src/index.ts
+            echo "Could not find dist/index.js or src/index.ts"
+            exit 1
           fi
-    name: "Debug: list workspace and reports"
+
+      - name: Debug reports
+        if: always()
         run: |
-          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          pwd
-          echo "Listing root"
-          ls -la
-          echo "Listing workspace .aca_reports"
-          ls -la "$GITHUB_WORKSPACE"/.aca_reports || true
-          echo "Find any json under workspace"
-          find "$GITHUB_WORKSPACE" -maxdepth 5 -type f -name '*.json' -print || true
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Report directory: $GITHUB_WORKSPACE/.aca_reports"
+          ls -la "$GITHUB_WORKSPACE/.aca_reports" || true
+          find "$GITHUB_WORKSPACE/.aca_reports" -type f -print || true
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: aca-reports
-          path: ${{ github.workspace }}/.aca_reports/**/*.json
+          path: .aca_reports/
+          if-no-files-found: warn
