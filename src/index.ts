@@ -1,29 +1,24 @@
 import { readConfig } from './config';
-import { runTask } from './runner';
+import { runWorkflow } from './workflow';
 
 async function main() {
   const config = readConfig();
+  const dry = process.env.ACA_DRY_RUN === '1' || process.env.ACA_DRY_RUN === 'true';
 
-  const task = {
-    id: 'aca-task-01',
-    repo: 'davibcv/aca',
-    description: 'Phase 2 scaffold bootstrap',
-    branch: config.branch,
-    criteria: ['build', 'lint', 'test'],
-    maxAttempts: 3
-  };
-
-  const result = await runTask(task, config.repoRoot);
+  const result = await runWorkflow({ dryRun: dry });
 
   console.log(JSON.stringify({
-    taskId: result.task.task.id,
+    ok: result.ok,
     summary: result.summary,
     applied: result.applied,
-    repoRoot: result.repoRoot
+    report: result.reportPath,
+    inspected: result.inspected
   }, null, 2));
+
+  if (!result.ok) process.exit(1);
 }
 
-main().catch((error: unknown) => {
-  console.error('ACA bootstrap failed:', error);
+main().catch((err) => {
+  console.error('Fatal:', err);
   process.exit(1);
 });
