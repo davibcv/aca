@@ -23,13 +23,20 @@ jobs:
           node-version: '20'
       - name: Install deps
         run: npm ci
-      - name: Run ACA workflow
+      - name: Build (if project has build step)
+        run: npm run build --if-present
+      - name: Run ACA workflow (prefer built JS)
         env:
           ACA_PROVIDER: ${{ github.event.inputs.provider }}
           GEMINI_API: ${{ secrets.GEMINI_API }}
           GEMINI_API_URL: ${{ secrets.GEMINI_API_URL }}
           ACA_DRY_RUN: ${{ github.event.inputs.dry_run }}
-        run: npx ts-node src/index.ts
+        run: |
+          if [ -f ./dist/index.js ]; then
+            node ./dist/index.js
+          else
+            npx ts-node src/index.ts
+          fi
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
