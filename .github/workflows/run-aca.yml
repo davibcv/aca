@@ -22,24 +22,41 @@ jobs:
         with:
           node-version: '20'
       - name: Install deps
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            npm install
+          fi
       - name: Build (if project has build step)
         run: npm run build --if-present
-      - name: Run ACA workflow (prefer built JS)
+      - name: Run ACA workflow
         env:
+          REPORT_DIR: ${{ github.workspace }}/.aca_reports
           ACA_PROVIDER: ${{ github.event.inputs.provider }}
           GEMINI_API: ${{ secrets.GEMINI_API }}
           GEMINI_API_URL: ${{ secrets.GEMINI_API_URL }}
           ACA_DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
+          mkdir -p "$REPORT_DIR"
           if [ -f ./dist/index.js ]; then
             node ./dist/index.js
           else
             npx ts-node src/index.ts
           fi
+      - name: Debug: list workspace and reports
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          pwd
+          echo "Listing root"
+          ls -la
+          echo "Listing workspace .aca_reports"
+          ls -la "$GITHUB_WORKSPACE"/.aca_reports || true
+          echo "Find any json under workspace"
+          find "$GITHUB_WORKSPACE" -maxdepth 5 -type f -name '*.json' -print || true
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: aca-reports
-          path: .aca_reports/**
+          path: ${{ github.workspace }}/.aca_reports/**/*.json
