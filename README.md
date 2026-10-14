@@ -1,32 +1,41 @@
 # ACA
 
-Agente de Reparação de Aplicativos (ACA) — núcleo e infraestrutura inicial.
+ACA is an autonomous coding agent scaffold for Phase 2.
 
-## Objetivo
+## Overview
 
-Este repositório implementa a base operacional do agente de engenharia assistida por IA para:
-- receber tarefas de manutenção e desenvolvimento
-- avaliar um projeto-alvo
-- identificar problemas
-- executar verificações determinísticas
-- propor correções
-- validar mudanças em uma branch isolada
-- gerar relatórios e artefatos
+This repository contains the foundation for an autonomous coding agent that can:
+- receive task definitions,
+- validate task records,
+- select a provider,
+- generate patches,
+- apply lightweight local changes,
+- run in a passive CI workflow.
 
-## Fase atual
+## Structure
 
-A construção está em fase 2: base executável e integração contínua.
+- `src/state.ts` — persistent task store
+- `src/orchestrator.ts` — cycle runner
+- `src/patcher.ts` — patch application utilities
+- `src/git.ts` — git helper functions
+- `src/config.ts` — runtime configuration
+- `src/providerFactory.ts` — provider selector
+- `src/agent.ts` — orchestration logic
+- `src/service.ts` — task service
+- `src/validator.ts` — validation
+- `src/providers/provider.ts` — AI provider contract
+- `src/providers/mock.ts` — mock provider
+- `src/providers/gemini.ts` — Gemini provider
+- `scripts/run_analysis_and_patch.js` — passive script
 
-## Estrutura
+## Usage
 
-- `src/` — código do agente e tipos
-- `scripts/` — scripts de análise/patch
-- `.github/workflows/` — automação
-- `docs/` — documentação operacional
+1. Define a task.
+2. Run the agent with a repo root.
+3. Validate the generated proposal.
+4. Apply the patch.
+5. Review git changes.
 
-## Observações de segurança
+## Status
 
-- Nunca gravar segredos no código-fonte.
-- Usar GitHub Actions Secrets para chaves de API e tokens.
-- O agente deve respeitar limites de execução, timeouts, tentativas e branch isolada.
-- A execução em repositórios-alvo deve ser controlada e não automática em branch principal.
+Phase 2 scaffold is in progress.
