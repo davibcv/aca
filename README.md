@@ -1,41 +1,62 @@
 # ACA
 
-ACA is an autonomous coding agent scaffold for Phase 2.
+Agente Corretor de Aplicativos (ACA) — scaffold Phase 2
 
-## Overview
+Este repositório contém um agente autónomo mínimo para gerar propostas de patchs para um repositório, aplicar alterações localmente e reportar resultados.
 
-This repository contains the foundation for an autonomous coding agent that can:
-- receive task definitions,
-- validate task records,
-- select a provider,
-- generate patches,
-- apply lightweight local changes,
-- run in a passive CI workflow.
+Status: fase 2 — scaffold funcional (mock provider) com integração opcional Gemini.
 
-## Structure
+Estrutura
+- `src/` — código fonte TypeScript
+- `src/providers/` — providers de AI (mock e Gemini)
+- `src/orchestrator.ts` — ciclo do agente
+- `src/workflow.ts` — executor do workflow (escreve relatório)
+- `src/runner.ts` — runner utilitário para execuções isoladas
+- `src/state.ts` — armazenamento simples de tasks em `.aca_state/tasks.json`
+- `tests/` — testes (vitest)
 
-- `src/state.ts` — persistent task store
-- `src/orchestrator.ts` — cycle runner
-- `src/patcher.ts` — patch application utilities
-- `src/git.ts` — git helper functions
-- `src/config.ts` — runtime configuration
-- `src/providerFactory.ts` — provider selector
-- `src/agent.ts` — orchestration logic
-- `src/service.ts` — task service
-- `src/validator.ts` — validation
-- `src/providers/provider.ts` — AI provider contract
-- `src/providers/mock.ts` — mock provider
-- `src/providers/gemini.ts` — Gemini provider
-- `scripts/run_analysis_and_patch.js` — passive script
+Quickstart (local)
+1. Clone o repositório e instale dependências:
 
-## Usage
+   git clone https://github.com/davibcv/aca.git
+   cd aca
+   npm ci
 
-1. Define a task.
-2. Run the agent with a repo root.
-3. Validate the generated proposal.
-4. Apply the patch.
-5. Review git changes.
+2. Run em modo dry-run (não aplica patches):
 
-## Status
+   export ACA_DRY_RUN=1
+   npx ts-node src/index.ts
 
-Phase 2 scaffold is in progress.
+   # ou build e executar
+   npm run build
+   ACA_DRY_RUN=1 node dist/index.js
+
+3. Para usar o Gemini provider localmente (não partilhar a chave no chat):
+
+   export ACA_PROVIDER=gemini
+   export GEMINI_API="<sua_chave_aqui>"     # nome do secret esperado pelo projeto
+   # opcionalmente, se usar endpoint alternativo:
+   # export GEMINI_API_URL="https://..."
+
+   export ACA_DRY_RUN=1
+   npx ts-node src/index.ts
+
+Secrets e GitHub Actions
+- Regista o secret `GEMINI_API` em Settings → Secrets and variables → Actions para que os workflows possam aceder à chave sem expô-la no código.
+
+CI e Workflows
+- O repositório inclui um workflow de CI que executa `npm run ci` em pushes e PRs.
+- Há também um workflow manual (`Run ACA workflow`) que permite disparar o agente (por defeito em dry-run). Sempre verifica `dry_run` antes de aplicar alterações num repositório remoto.
+
+Como funciona
+- `src/index.ts` é o ponto de entrada canonical: chama `runWorkflow`.
+- `runWorkflow` chama `runCycle` (orchestrator) que busca/gera tasks, pede uma `proposal` ao provider e aplica patches com `patcher` (quando houver).
+- Propostas são gravadas como relatórios em `.aca_reports/` (um ficheiro JSON por execução).
+
+Contribuição e roadmap
+- Integrar provider Gemini com prompts robustos e parsing tolerante.
+- Melhorar regras de segurança (validar patches antes de aplicar, testes automatizados, revisão humana opcional).
+- Adicionar testes end-to-end e integração com GitHub PR flow.
+
+Licença
+- UNLICENSED (ver package.json)
