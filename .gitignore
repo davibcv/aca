@@ -1,0 +1,11 @@
+# Node / TypeScript / system
+
+node_modules
+dist
+.env
+.DS_Store
+coverage
+.vscode
+.idea
+.secret
+secrets.json
