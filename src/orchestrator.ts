@@ -7,6 +7,8 @@ type InspectionFinding = {
   file: string;
   line: number;
   marker: 'TODO' | 'FIXME';
+  category: 'maintenance';
+  severity: 'low' | 'medium';
   text: string;
 };
 
@@ -183,7 +185,10 @@ function inspectRepository(repoRoot: string): {
         files.push({
           path: relativePath,
           sizeBytes: stat.size,
-          lines: content.length === 0 ? 0 : content.split(/\r\n|\r|\n/).length
+          lines:
+            content.length === 0
+              ? 0
+              : content.split(/\r\n|\r|\n/).length
         });
 
         totalBytesRead += Buffer.byteLength(content, 'utf8');
@@ -196,10 +201,16 @@ function inspectRepository(repoRoot: string): {
 
           if (match) {
             if (findings.length < MAX_FINDINGS) {
+              const marker = match[1].toUpperCase() as
+                | 'TODO'
+                | 'FIXME';
+
               findings.push({
                 file: relativePath,
                 line: index + 1,
-                marker: match[1].toUpperCase() as 'TODO' | 'FIXME',
+                marker,
+                category: 'maintenance',
+                severity: marker === 'FIXME' ? 'medium' : 'low',
                 text: line.trim().slice(0, 300)
               });
             } else {
@@ -234,7 +245,9 @@ function inspectRepository(repoRoot: string): {
   };
 }
 
-export async function runCycle(_opts: { dryRun?: boolean } = {}): Promise<{
+export async function runCycle(
+  _opts: { dryRun?: boolean } = {}
+): Promise<{
   ok: boolean;
   inspected?: string;
   taskId?: string;
@@ -267,7 +280,8 @@ export async function runCycle(_opts: { dryRun?: boolean } = {}): Promise<{
         `found ${result.findings.length} TODO/FIXME markers; ` +
         `read ${result.totalBytesRead} bytes.`,
       applied: 0,
-      errors: inspectionErrors.length > 0 ? inspectionErrors : undefined,
+      errors:
+        inspectionErrors.length > 0 ? inspectionErrors : undefined,
       inspection: {
         mode: 'read-only',
         repositoryRoot: repoRoot,

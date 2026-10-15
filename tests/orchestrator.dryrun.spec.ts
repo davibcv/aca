@@ -1,3 +1,4 @@
+
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,11 +23,13 @@ describe('orchestrator read-only inspection', () => {
     originalRepoRoot = process.env.ACA_REPO_ROOT;
 
     await fs.mkdir(path.join(tmpRoot, 'src'), { recursive: true });
-    await fs.mkdir(path.join(tmpRoot, 'node_modules'), { recursive: true });
+    await fs.mkdir(path.join(tmpRoot, 'node_modules'), {
+      recursive: true
+    });
 
     await fs.writeFile(
       path.join(tmpRoot, 'src', 'sample.ts'),
-      '// TODO: fix me\nconst x = 1;\n',
+      '// TODO: fix me\n// FIXME: investigate this\nconst x = 1;\n',
       'utf8'
     );
 
@@ -49,30 +52,46 @@ describe('orchestrator read-only inspection', () => {
     await fs.rm(tmpRoot, { recursive: true, force: true });
   });
 
-  test('finds TODO markers and skips node_modules without applying patches', async () => {
-    const res = await runCycle({ dryRun: true });
+  test(
+    'classifies TODO and FIXME, skips node_modules, and applies no patches',
+    async () => {
+      const res = await runCycle({ dryRun: true });
 
-    expect(res.ok).toBe(true);
-    expect(res.applied).toBe(0);
-    expect(res.inspection?.mode).toBe('read-only');
+      expect(res.ok).toBe(true);
+      expect(res.applied).toBe(0);
+      expect(res.inspection?.mode).toBe('read-only');
 
-    const inspectedPaths = res.inspection?.files.map((file) => file.path) ?? [];
+      const inspectedPaths =
+        res.inspection?.files.map((file) => file.path) ?? [];
 
-    expect(inspectedPaths).toContain('src/sample.ts');
-    expect(inspectedPaths).not.toContain('node_modules/ignored.ts');
+      expect(inspectedPaths).toContain('src/sample.ts');
+      expect(inspectedPaths).not.toContain('node_modules/ignored.ts');
 
-    const findings = res.inspection?.findings ?? [];
+      const findings = res.inspection?.findings ?? [];
 
-    expect(findings).toContainEqual(
-      expect.objectContaining({
-        file: 'src/sample.ts',
-        line: 1,
-        marker: 'TODO'
-      })
-    );
+      expect(findings).toContainEqual(
+        expect.objectContaining({
+          file: 'src/sample.ts',
+          line: 1,
+          marker: 'TODO',
+          category: 'maintenance',
+          severity: 'low'
+        })
+      );
 
-    const rootEntries = await fs.readdir(tmpRoot);
+      expect(findings).toContainEqual(
+        expect.objectContaining({
+          file: 'src/sample.ts',
+          line: 2,
+          marker: 'FIXME',
+          category: 'maintenance',
+          severity: 'medium'
+        })
+      );
 
-    expect(rootEntries).not.toContain('.aca_reports');
-  });
+      const rootEntries = await fs.readdir(tmpRoot);
+
+      expect(rootEntries).not.toContain('.aca_reports');
+    }
+  );
 });
