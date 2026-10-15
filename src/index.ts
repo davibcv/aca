@@ -3,17 +3,29 @@ import { runWorkflow } from './workflow';
 
 async function main() {
   const config = readConfig();
-  const dry = process.env.ACA_DRY_RUN === '1' || process.env.ACA_DRY_RUN === 'true';
 
-  const result = await runWorkflow({ dryRun: dry });
+  const dry =
+    process.env.ACA_DRY_RUN === '1' ||
+    process.env.ACA_DRY_RUN === 'true';
 
-  console.log(JSON.stringify({
-    ok: result.ok,
-    summary: result.summary,
-    applied: result.applied,
-    report: result.reportPath,
-    inspected: result.inspected
-  }, null, 2));
+  const result = await runWorkflow({
+    dryRun: dry,
+    repoRoot: config.repoRoot
+  });
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: result.ok,
+        summary: result.summary,
+        applied: result.applied,
+        report: result.reportPath,
+        inspected: result.inspected
+      },
+      null,
+      2
+    )
+  );
 
   if (!result.ok) process.exit(1);
 }

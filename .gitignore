@@ -1,0 +1,19 @@
+# Dependências
+node_modules/
+
+# Arquivos compilados
+dist/
+
+# Relatórios e estado local do ACA
+.aca_reports/
+.aca_state/
+
+# Configurações e segredos locais
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*

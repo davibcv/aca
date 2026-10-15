@@ -1,48 +1,78 @@
-// tests/orchestrator.dryrun.spec.ts
-import fs from "fs";
-import path from "path";
-import os from "os";
-import { runCycle } from "../src/orchestrator";
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  test
+} from 'vitest';
+import { runCycle } from '../src/orchestrator';
 
-describe("orchestrator runCycle dry-run", () => {
-  const tmpRoot = path.join(os.tmpdir(), `aca-test-${Date.now()}`);
+describe('orchestrator read-only inspection', () => {
+  const tmpRoot = path.join(
+    os.tmpdir(),
+    `aca-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+
+  let originalRepoRoot: string | undefined;
 
   beforeAll(async () => {
-    // create a small fixture repo
-    await fs.promises.mkdir(tmpRoot, { recursive: true });
-    // sample file with TODO
-    await fs.promises.writeFile(path.join(tmpRoot, "sample.ts"), "// TODO: fix me\nconst x = 1;\n");
-    // create a node_modules dir to ensure skip works
-    await fs.promises.mkdir(path.join(tmpRoot, "node_modules"), { recursive: true });
+    originalRepoRoot = process.env.ACA_REPO_ROOT;
+
+    await fs.mkdir(path.join(tmpRoot, 'src'), { recursive: true });
+    await fs.mkdir(path.join(tmpRoot, 'node_modules'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(tmpRoot, 'src', 'sample.ts'),
+      '// TODO: fix me\nconst x = 1;\n',
+      'utf8'
+    );
+
+    await fs.writeFile(
+      path.join(tmpRoot, 'node_modules', 'ignored.ts'),
+      '// FIXME: this should be ignored\n',
+      'utf8'
+    );
+
+    process.env.ACA_REPO_ROOT = tmpRoot;
   });
 
   afterAll(async () => {
-    // cleanup
-    try {
-      await fs.promises.rm(tmpRoot, { recursive: true, force: true });
-    } catch {
-      // ignore
+    if (originalRepoRoot === undefined) {
+      delete process.env.ACA_REPO_ROOT;
+    } else {
+      process.env.ACA_REPO_ROOT = originalRepoRoot;
     }
+
+    await fs.rm(tmpRoot, { recursive: true, force: true });
   });
 
-  test("runCycle in dry-run inspects files and writes report without applying patches", async () => {
-    const reportDir = path.join(tmpRoot, ".aca_reports");
-    const res = await runCycle({
-      repoPath: tmpRoot,
-      reportDir,
-      dryRun: true,
-      providerName: "mock",
-      maxFiles: 50,
-      maxFileBytes: 1024 * 50,
-    });
-    expect(res).toBeDefined();
+  test('finds TODO markers and skips node_modules without applying patches', async () => {
+    const res = await runCycle({ dryRun: true });
+
     expect(res.ok).toBe(true);
-    expect(Array.isArray(res.inspected)).toBe(true);
-    // report file exists
-    const files = await fs.promises.readdir(reportDir);
-    const jsons = files.filter((f) => f.endsWith(".json"));
-    expect(jsons.length).toBeGreaterThan(0);
-    // result applied must be false in dry-run
-    expect(res.applied).toBe(false);
-  }, 20000);
+    expect(res.applied).toBe(0);
+    expect(res.inspection?.mode).toBe('read-only');
+
+    const inspectedPaths = res.inspection?.files.map((file) => file.path) ?? [];
+
+    expect(inspectedPaths).toContain('src/sample.ts');
+    expect(inspectedPaths).not.toContain('node_modules/ignored.ts');
+
+    const findings = res.inspection?.findings ?? [];
+
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        file: 'src/sample.ts',
+        line: 1,
+        marker: 'TODO'
+      })
+    );
+
+    const rootEntries = await fs.readdir(tmpRoot);
+
+    expect(rootEntries).not.toContain('.aca_reports');
+  });
 });
