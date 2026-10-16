@@ -10,6 +10,7 @@ import {
   test
 } from 'vitest';
 import { runCycle } from '../src/orchestrator';
+import { runWorkflow } from '../src/workflow';
 
 describe('orchestrator read-only inspection', () => {
   const tmpRoot = path.join(
@@ -53,23 +54,23 @@ describe('orchestrator read-only inspection', () => {
   });
 
   test(
-    'classifies TODO and FIXME, skips node_modules, and applies no patches',
+    'classifies findings, writes a JSON report through the workflow, skips dependencies, and applies no patches',
     async () => {
-      const res = await runCycle({ dryRun: true });
+      const inspection = await runCycle({ dryRun: true });
 
-      expect(res.ok).toBe(true);
-      expect(res.applied).toBe(0);
-      expect(res.inspection?.mode).toBe('read-only');
+      expect(inspection.ok).toBe(true);
+      expect(inspection.applied).toBe(0);
+      expect(inspection.inspection?.mode).toBe('read-only');
+      expect(inspection.inspection?.repositoryRoot).toBe(tmpRoot);
+      expect(inspection.inspection?.findings).toHaveLength(2);
 
       const inspectedPaths =
-        res.inspection?.files.map((file) => file.path) ?? [];
+        inspection.inspection?.files.map((file) => file.path) ?? [];
 
       expect(inspectedPaths).toContain('src/sample.ts');
       expect(inspectedPaths).not.toContain('node_modules/ignored.ts');
 
-      const findings = res.inspection?.findings ?? [];
-
-      expect(findings).toContainEqual(
+      expect(inspection.inspection?.findings).toContainEqual(
         expect.objectContaining({
           file: 'src/sample.ts',
           line: 1,
@@ -79,7 +80,7 @@ describe('orchestrator read-only inspection', () => {
         })
       );
 
-      expect(findings).toContainEqual(
+      expect(inspection.inspection?.findings).toContainEqual(
         expect.objectContaining({
           file: 'src/sample.ts',
           line: 2,
@@ -89,9 +90,48 @@ describe('orchestrator read-only inspection', () => {
         })
       );
 
-      const rootEntries = await fs.readdir(tmpRoot);
+      // A inspeção isolada não deve criar relatórios.
+      await expect(
+        fs.access(path.join(tmpRoot, '.aca_reports'))
+      ).rejects.toThrow();
 
-      expect(rootEntries).not.toContain('.aca_reports');
+      const workflowResult = await runWorkflow({
+        dryRun: true,
+        repoRoot: tmpRoot
+      });
+
+      expect(workflowResult.ok).toBe(true);
+      expect(workflowResult.applied).toBe(0);
+      expect(workflowResult.reportPath).toBeTruthy();
+
+      const reportContent = await fs.readFile(
+        workflowResult.reportPath!,
+        'utf8'
+      );
+
+      const report = JSON.parse(reportContent);
+
+      expect(report.schemaVersion).toBe(1);
+      expect(report.mode).toBe('read-only');
+      expect(report.status).toBe('success');
+      expect(report.repositoryRoot).toBe(tmpRoot);
+      expect(report.summary.totalFindings).toBe(2);
+      expect(report.summary.bySeverity).toEqual({
+        low: 1,
+        medium: 1
+      });
+      expect(report.summary.byCategory).toEqual({
+        maintenance: 2
+      });
+      expect(report.findings).toHaveLength(2);
+      expect(report.errors).toEqual([]);
+      expect(typeof report.generatedAt).toBe('string');
+
+      const inspectedReportPaths =
+        workflowResult.inspection?.files.map((file) => file.path) ?? [];
+
+      expect(inspectedReportPaths).not.toContain('.aca_reports/latest.json');
+      expect(workflowResult.applied).toBe(0);
     }
   );
 });

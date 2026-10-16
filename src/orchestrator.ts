@@ -18,6 +18,14 @@ type InspectedFile = {
   lines: number;
 };
 
+type InspectionResult = {
+  files: InspectedFile[];
+  findings: InspectionFinding[];
+  errors: string[];
+  totalBytesRead: number;
+  truncated: boolean;
+};
+
 const IGNORED_DIRECTORIES = new Set([
   '.git',
   'node_modules',
@@ -28,41 +36,13 @@ const IGNORED_DIRECTORIES = new Set([
 ]);
 
 const TEXT_EXTENSIONS = new Set([
-  '.ts',
-  '.tsx',
-  '.js',
-  '.jsx',
-  '.mjs',
-  '.cjs',
-  '.json',
-  '.md',
-  '.mdx',
-  '.yml',
-  '.yaml',
-  '.html',
-  '.css',
-  '.scss',
-  '.less',
-  '.py',
-  '.java',
-  '.c',
-  '.h',
-  '.cpp',
-  '.hpp',
-  '.cs',
-  '.go',
-  '.rs',
-  '.php',
-  '.rb',
-  '.sh',
-  '.bash',
-  '.sql',
-  '.xml',
-  '.toml',
-  '.ini',
-  '.txt',
-  '.gitignore',
-  '.editorconfig'
+  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
+  '.json', '.md', '.mdx', '.yml', '.yaml',
+  '.html', '.css', '.scss', '.less', '.py',
+  '.java', '.c', '.h', '.cpp', '.hpp', '.cs',
+  '.go', '.rs', '.php', '.rb', '.sh', '.bash',
+  '.sql', '.xml', '.toml', '.ini', '.txt',
+  '.gitignore', '.editorconfig'
 ]);
 
 const SPECIAL_TEXT_FILES = new Set([
@@ -97,13 +77,7 @@ function isInsideRoot(root: string, target: string): boolean {
   );
 }
 
-function inspectRepository(repoRoot: string): {
-  files: InspectedFile[];
-  findings: InspectionFinding[];
-  errors: string[];
-  totalBytesRead: number;
-  truncated: boolean;
-} {
+function inspectRepository(repoRoot: string): InspectionResult {
   const root = path.resolve(repoRoot);
 
   if (!fs.existsSync(root)) {
@@ -143,27 +117,20 @@ function inspectRepository(repoRoot: string): {
       const absolutePath = path.resolve(directory, entry.name);
 
       if (!isInsideRoot(root, absolutePath)) {
-        errors.push(
-          `Skipped path outside repository root: ${absolutePath}`
-        );
+        errors.push(`Skipped path outside repository root: ${absolutePath}`);
         continue;
       }
 
-      if (entry.isSymbolicLink()) {
-        continue;
-      }
+      if (entry.isSymbolicLink()) continue;
 
       if (entry.isDirectory()) {
         if (!IGNORED_DIRECTORIES.has(entry.name)) {
           visit(absolutePath);
         }
-
         continue;
       }
 
-      if (!entry.isFile() || !isTextFile(absolutePath)) {
-        continue;
-      }
+      if (!entry.isFile() || !isTextFile(absolutePath)) continue;
 
       if (files.length >= MAX_FILES) {
         truncated = true;
@@ -199,28 +166,26 @@ function inspectRepository(repoRoot: string): {
           const line = lines[index];
           const match = line.match(/\b(TODO|FIXME)\b/i);
 
-          if (match) {
-            if (findings.length < MAX_FINDINGS) {
-              const marker = match[1].toUpperCase() as
-                | 'TODO'
-                | 'FIXME';
+          if (!match) continue;
 
-              findings.push({
-                file: relativePath,
-                line: index + 1,
-                marker,
-                category: 'maintenance',
-                severity: marker === 'FIXME' ? 'medium' : 'low',
-                text: line.trim().slice(0, 300)
-              });
-            } else {
-              truncated = true;
-              errors.push(
-                `Finding limit of ${MAX_FINDINGS} reached; inspection results may be incomplete.`
-              );
-              return;
-            }
+          if (findings.length >= MAX_FINDINGS) {
+            truncated = true;
+            errors.push(
+              `Finding limit of ${MAX_FINDINGS} reached; inspection results may be incomplete.`
+            );
+            return;
           }
+
+          const marker = match[1].toUpperCase() as 'TODO' | 'FIXME';
+
+          findings.push({
+            file: relativePath,
+            line: index + 1,
+            marker,
+            category: 'maintenance',
+            severity: marker === 'FIXME' ? 'medium' : 'low',
+            text: line.trim().slice(0, 300)
+          });
         }
       } catch (error) {
         errors.push(
@@ -235,6 +200,11 @@ function inspectRepository(repoRoot: string): {
   visit(root);
 
   files.sort((a, b) => a.path.localeCompare(b.path));
+  findings.sort(
+    (a, b) =>
+      a.file.localeCompare(b.file) ||
+      a.line - b.line
+  );
 
   return {
     files,
@@ -246,7 +216,7 @@ function inspectRepository(repoRoot: string): {
 }
 
 export async function runCycle(
-  _opts: { dryRun?: boolean } = {}
+  opts: { dryRun?: boolean; repoRoot?: string } = {}
 ): Promise<{
   ok: boolean;
   inspected?: string;
@@ -265,23 +235,20 @@ export async function runCycle(
   };
 }> {
   const config = readConfig();
-  const repoRoot = path.resolve(config.repoRoot);
+  const repoRoot = path.resolve(opts.repoRoot ?? config.repoRoot);
 
   try {
     const result = inspectRepository(repoRoot);
 
-    const inspectionErrors = result.errors;
-
     return {
-      ok: inspectionErrors.length === 0,
+      ok: result.errors.length === 0,
       inspected: `Read-only inspection of ${result.files.length} text files`,
       summary:
         `Inspected ${result.files.length} text files; ` +
         `found ${result.findings.length} TODO/FIXME markers; ` +
         `read ${result.totalBytesRead} bytes.`,
       applied: 0,
-      errors:
-        inspectionErrors.length > 0 ? inspectionErrors : undefined,
+      errors: result.errors.length > 0 ? result.errors : undefined,
       inspection: {
         mode: 'read-only',
         repositoryRoot: repoRoot,
