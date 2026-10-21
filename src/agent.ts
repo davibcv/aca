@@ -1,26 +1,28 @@
 import { createProvider } from './providerFactory';
 import { createTask } from './state';
 import { validateTask } from './validator';
+import type { Task } from './types';
 
-export async function runAgent(taskInput: {
-  id: string;
-  repo: string;
-  description: string;
-  branch?: string;
-  criteria?: string[];
-  maxAttempts?: number;
-}) {
-  const task = createTask(taskInput);
-  const validation = validateTask(task);
+export async function runAgent(taskInput: Task) {
+  const candidate = {
+    task: taskInput,
+    state: 'pending' as const,
+    attempts: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    logs: []
+  };
+
+  const validation = validateTask(candidate);
 
   if (!validation.ok) {
     return {
       ok: false,
-      task,
       errors: validation.errors
     };
   }
 
+  const task = createTask(taskInput);
   const provider = createProvider();
   const proposal = await provider.generateProposal(task.task);
 

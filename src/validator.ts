@@ -1,29 +1,50 @@
-import { TaskRecord } from './types';
+import type { TaskRecord } from './types';
 
-export function validateTask(record: TaskRecord): { ok: boolean; errors: string[] } {
+export function validateTask(
+  record: TaskRecord
+): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
+  const task = record?.task;
 
-  if (!record.task.id || record.task.id.trim() === '') {
+  if (!task || typeof task !== 'object') {
+    return { ok: false, errors: ['Task is required.'] };
+  }
+
+  if (typeof task.id !== 'string' || !task.id.trim()) {
     errors.push('Task id is required.');
   }
 
-  if (!record.task.repo || record.task.repo.trim() === '') {
+  if (typeof task.repo !== 'string' || !task.repo.trim()) {
     errors.push('Task repo is required.');
   }
 
-  if (!record.task.description || record.task.description.trim() === '') {
+  if (typeof task.description !== 'string' || !task.description.trim()) {
     errors.push('Task description is required.');
   }
 
   if (
-    typeof record.task.maxAttempts === 'number' &&
-    (Number.isNaN(record.task.maxAttempts) || record.task.maxAttempts < 1)
+    task.maxAttempts !== undefined &&
+    (!Number.isInteger(task.maxAttempts) || task.maxAttempts < 1)
   ) {
-    errors.push('Task maxAttempts must be a positive number.');
+    errors.push('Task maxAttempts must be a positive integer.');
   }
 
-  return {
-    ok: errors.length === 0,
-    errors
-  };
+  if (
+    task.criteria !== undefined &&
+    (!Array.isArray(task.criteria) ||
+      !task.criteria.every(
+        (criterion) => typeof criterion === 'string' && criterion.trim()
+      ))
+  ) {
+    errors.push('Task criteria must contain non-empty strings.');
+  }
+
+  if (
+    task.branch !== undefined &&
+    (typeof task.branch !== 'string' || !task.branch.trim())
+  ) {
+    errors.push('Task branch must be a non-empty string.');
+  }
+
+  return { ok: errors.length === 0, errors };
 }

@@ -1,7 +1,7 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'node:child_process';
 
 export function git(args: string[], cwd: string = process.cwd()): string {
-  return execSync(`git ${args.join(' ')}`, {
+  return execFileSync('git', args, {
     cwd,
     encoding: 'utf8',
     stdio: ['pipe', 'pipe', 'pipe']
@@ -21,7 +21,10 @@ export function getDiffSummary(cwd: string = process.cwd()): string {
 }
 
 export function ensureBranch(branch: string, cwd: string = process.cwd()) {
+  git(['check-ref-format', '--branch', branch]);
+
   const current = getCurrentBranch(cwd);
+
   if (current !== branch) {
     try {
       git(['checkout', branch], cwd);

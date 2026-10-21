@@ -63,6 +63,7 @@ describe('orchestrator read-only inspection', () => {
       expect(inspection.inspection?.mode).toBe('read-only');
       expect(inspection.inspection?.repositoryRoot).toBe(tmpRoot);
       expect(inspection.inspection?.findings).toHaveLength(2);
+      expect(inspection.inspection?.findings.every((finding) => finding.file === "src/sample.ts")).toBe(true);
 
       const inspectedPaths =
         inspection.inspection?.files.map((file) => file.path) ?? [];

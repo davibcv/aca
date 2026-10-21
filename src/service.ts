@@ -1,5 +1,4 @@
 import { runAgent } from './agent';
-import { createTask } from './state';
 
 export async function enqueueTask(taskInput: {
   id: string;
@@ -9,12 +8,5 @@ export async function enqueueTask(taskInput: {
   criteria?: string[];
   maxAttempts?: number;
 }) {
-  const task = createTask(taskInput);
-
-  const result = await runAgent(task.task);
-
-  return {
-    ...result,
-    storedTask: task
-  };
+  return await runAgent(taskInput);
 }

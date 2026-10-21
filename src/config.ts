@@ -6,8 +6,16 @@ export type AppConfig = {
 };
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const rawProvider = env.ACA_PROVIDER ?? 'mock';
+
+  if (rawProvider !== 'mock' && rawProvider !== 'gemini') {
+    throw new Error(
+      `Invalid ACA_PROVIDER "${rawProvider}". Use "mock" or "gemini".`
+    );
+  }
+
   return {
-    provider: (env.ACA_PROVIDER ?? 'mock') as AppConfig['provider'],
+    provider: rawProvider,
     apiKey: env.GEMINI_API || env.GEMINI_API_KEY || env.GOOGLE_API_KEY,
     repoRoot: env.ACA_REPO_ROOT || process.cwd(),
     branch: env.ACA_BRANCH || 'feature/phase-2'

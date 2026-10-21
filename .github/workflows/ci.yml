@@ -27,9 +27,5 @@ jobs:
           else
             npm install
           fi
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint (non-blocking)
-        run: npm run lint
-      - name: Run tests
-        run: npm test
+      - name: Run CI checks
+        run: npm run ci

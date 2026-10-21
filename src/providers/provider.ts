@@ -1,3 +1,5 @@
+import type { Task } from '../types';
+
 export type Proposal = {
   summary: string;
   patches: Array<{
@@ -7,5 +9,5 @@ export type Proposal = {
 };
 
 export interface AIProvider {
-  generateProposal(task: any): Promise<Proposal>;
+  generateProposal(task: Task): Promise<Proposal>;
 }
