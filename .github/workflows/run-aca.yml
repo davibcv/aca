@@ -8,6 +8,11 @@ on:
         required: false
         type: boolean
         default: true
+      apply_patches:
+        description: "Enable active patch application"
+        required: false
+        type: boolean
+        default: false
       provider:
         description: "Provider to use: mock or gemini"
         required: false
@@ -18,7 +23,7 @@ on:
         default: mock
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   run:
@@ -52,17 +57,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_API_URL: ${{ secrets.GEMINI_API_URL }}
           ACA_DRY_RUN: ${{ inputs.dry_run }}
+          ACA_APPLY_PATCHES: ${{ inputs.apply_patches }}
         run: |
           mkdir -p "$REPORT_DIR"
-
-          if [ -f ./dist/index.js ]; then
-            node ./dist/index.js
-          elif [ -f ./src/index.ts ]; then
-            npx --yes tsx src/index.ts
-          else
-            echo "Could not find dist/index.js or src/index.ts"
-            exit 1
-          fi
+          node ./dist/index.js
 
       - name: Debug reports
         if: always()

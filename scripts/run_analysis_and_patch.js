@@ -1,30 +1,51 @@
 #!/usr/bin/env node
 
-const { execSync } = require('child_process');
+const path = require('path');
+const fs = require('fs');
 
-function run(command) {
-  try {
-    return execSync(command, { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
-  } catch (error) {
-    const stderr = error && error.stderr ? error.stderr.toString() : '';
-    const stdout = error && error.stdout ? error.stdout.toString() : '';
-    throw new Error(`${stderr || stdout || String(error)}`);
-  }
-}
+async function main() {
+  const repo = path.resolve(process.env.ACA_REPO_ROOT || process.cwd());
+  console.log(`[ACA] Executando analise e ciclo no repositorio: ${repo}`);
 
-function main() {
-  const repo = process.cwd();
-  console.log(`ACA analysis scaffold running in ${repo}`);
-
-  try {
-    const status = run('git status --short');
-    console.log('git status:\n' + (status || '(clean)'));
-  } catch (error) {
-    console.error('Failed to inspect repo:', error.message);
+  const distEntry = path.join(repo, 'dist', 'index.js');
+  if (!fs.existsSync(distEntry)) {
+    console.error('[ACA] Build ausente. Execute `npm run build` antes de rodar este script.');
     process.exit(1);
   }
 
-  console.log('Analysis scaffold ready. Add provider logic here.');
+  const { runWorkflow } = require(path.join(repo, 'dist', 'workflow.js'));
+
+  const dry = process.env.ACA_DRY_RUN !== '0' && process.env.ACA_DRY_RUN !== 'false';
+  const applyPatches = process.env.ACA_APPLY_PATCHES === '1' || process.env.ACA_APPLY_PATCHES === 'true';
+
+  try {
+    const result = await runWorkflow({
+      repoRoot: repo,
+      dryRun: dry,
+      applyPatchesMode: applyPatches
+    });
+
+    console.log(
+      JSON.stringify(
+        {
+          ok: result.ok,
+          summary: result.summary,
+          applied: result.applied,
+          report: result.reportPath,
+          execution: result.execution
+        },
+        null,
+        2
+      )
+    );
+
+    if (!result.ok) {
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error('[ACA] Falha fatal no ciclo:', err);
+    process.exit(1);
+  }
 }
 
 main();

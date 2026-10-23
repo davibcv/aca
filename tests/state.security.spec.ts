@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { createTask, readAllTasks } from '../src/state';
+import { createTask, getTaskById, readAllTasks, updateTaskState } from '../src/state';
 
 const roots: string[] = [];
 const originalStateDir = process.env.ACA_STATE_DIR;
@@ -38,6 +38,55 @@ describe('task state security', () => {
 
     expect(readAllTasks()).toHaveLength(1);
     expect(readAllTasks()[0].task.id).toBe('test-1');
+  });
+
+  test('does not duplicate task on repeated createTask calls with same id', () => {
+    useTemporaryDatabase();
+
+    const first = createTask({
+      id: 'test-idempotent',
+      repo: '/tmp/example',
+      description: 'Initial'
+    });
+
+    const second = createTask({
+      id: 'test-idempotent',
+      repo: '/tmp/example',
+      description: 'Updated attempt'
+    });
+
+    expect(readAllTasks()).toHaveLength(1);
+    expect(second.createdAt).toBe(first.createdAt);
+  });
+
+  test('updates task state, attempts and appends logs', () => {
+    useTemporaryDatabase();
+
+    createTask({
+      id: 'test-update',
+      repo: '/tmp/example',
+      description: 'To update'
+    });
+
+    updateTaskState('test-update', {
+      state: 'running',
+      attempts: 1,
+      log: 'Iniciando execucao'
+    });
+
+    const updated = getTaskById('test-update');
+    expect(updated).toBeDefined();
+    expect(updated?.state).toBe('running');
+    expect(updated?.attempts).toBe(1);
+    expect(updated?.logs).toContain('Iniciando execucao');
+  });
+
+  test('throws when updating non-existent task', () => {
+    useTemporaryDatabase();
+
+    expect(() =>
+      updateTaskState('non-existent', { state: 'failed' })
+    ).toThrow(/Task with id "non-existent" not found/);
   });
 
   test('refuses to overwrite a corrupted database', () => {

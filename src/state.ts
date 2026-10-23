@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { TaskRecord } from './types';
+import type { TaskRecord, TaskState } from './types';
 
 function getDbPaths() {
   const dbDir = path.resolve(
@@ -50,6 +50,11 @@ export function readAllTasks(): TaskRecord[] {
   return parsed as TaskRecord[];
 }
 
+export function getTaskById(id: string): TaskRecord | undefined {
+  const all = readAllTasks();
+  return all.find((item) => item.task.id === id);
+}
+
 export function saveTask(record: TaskRecord) {
   const { dir, file } = getDbPaths();
   ensureDbDir(dir, file);
@@ -75,6 +80,37 @@ export function saveTask(record: TaskRecord) {
   }
 }
 
+export function updateTaskState(
+  id: string,
+  updates: {
+    state?: TaskState;
+    attempts?: number;
+    log?: string;
+  }
+): TaskRecord {
+  const record = getTaskById(id);
+  if (!record) {
+    throw new Error(`Task with id "${id}" not found.`);
+  }
+
+  if (updates.state !== undefined) {
+    record.state = updates.state;
+  }
+
+  if (updates.attempts !== undefined) {
+    record.attempts = updates.attempts;
+  }
+
+  if (updates.log) {
+    record.logs = record.logs ?? [];
+    record.logs.push(updates.log);
+  }
+
+  record.updatedAt = new Date().toISOString();
+  saveTask(record);
+  return record;
+}
+
 export function createTask(task: {
   id: string;
   repo: string;
@@ -83,6 +119,11 @@ export function createTask(task: {
   criteria?: string[];
   maxAttempts?: number;
 }): TaskRecord {
+  const existing = getTaskById(task.id);
+  if (existing) {
+    return existing;
+  }
+
   const record: TaskRecord = {
     task,
     state: 'pending',

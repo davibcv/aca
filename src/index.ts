@@ -8,8 +8,13 @@ async function main() {
     process.env.ACA_DRY_RUN === '1' ||
     process.env.ACA_DRY_RUN === 'true';
 
+  const applyPatches =
+    process.env.ACA_APPLY_PATCHES === '1' ||
+    process.env.ACA_APPLY_PATCHES === 'true';
+
   const result = await runWorkflow({
     dryRun: dry,
+    applyPatchesMode: applyPatches,
     repoRoot: config.repoRoot
   });
 
@@ -20,7 +25,8 @@ async function main() {
         summary: result.summary,
         applied: result.applied,
         report: result.reportPath,
-        inspected: result.inspected
+        inspected: result.inspected,
+        execution: result.execution
       },
       null,
       2
