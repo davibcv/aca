@@ -1,4 +1,3 @@
-
 import type { Task } from '../types';
 import type { AIProvider, Proposal } from './provider';
 
@@ -87,18 +86,30 @@ export class GeminiProvider implements AIProvider {
     return url.toString();
   }
 
-  async generateProposal(task: Task): Promise<Proposal> {
-    if (!this.apiKey) {
-      throw new Error('Missing Gemini API key (GEMINI_API_KEY).');
+  private buildPrompt(task: Task): string {
+    let filesContextText = '';
+    if (task.files && task.files.length > 0) {
+      filesContextText =
+        '\n\nArquivos Relevantes do Repositório (leitura segura):\n' +
+        task.files
+          .map(
+            (f) =>
+              `=== Início de ${f.path} ===\n${f.content}\n=== Fim de ${f.path} ===`
+          )
+          .join('\n\n') +
+        '\n\nImportante: preserve rigorosamente a estrutura, importações e o código existente dos arquivos acima, alterando apenas o necessário para atender aos apontamentos da tarefa.';
     }
 
-    const prompt = `Você é um assistente de IA focado em desenvolvimento de software.
+    return `Você é um assistente de IA focado em desenvolvimento de software.
 
 Instrução:
 Gere uma proposta de alterações de código (patches) no formato JSON estrito para realizar a tarefa abaixo.
 
 Tarefa:
-${JSON.stringify(task, null, 2)}
+ID: ${task.id}
+Repositório: ${task.repo}
+Descrição:
+${task.description}${filesContextText}
 
 Você DEVE responder UNICAMENTE e EXCLUSIVAMENTE com um objeto JSON válido, sem markdown, sem blocos de código com markdown (como triplas crases), contendo exatamente duas chaves:
 1. "summary": um resumo explicativo textual breve das alterações.
@@ -110,10 +121,18 @@ Exemplo de resposta esperada:
   "patches": [
     {
       "path": "README.md",
-      "content": "# Meu Repositório\\\\nEste projeto está documentado."
+      "content": "# Meu Repositório\\nEste projeto está documentado."
     }
   ]
 }`;
+  }
+
+  async generateProposal(task: Task): Promise<Proposal> {
+    if (!this.apiKey) {
+      throw new Error('Missing Gemini API key (GEMINI_API_KEY).');
+    }
+
+    const prompt = this.buildPrompt(task);
 
     try {
       const fetch = this.fetchImpl ?? (await getFetch());

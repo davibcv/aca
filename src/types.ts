@@ -1,3 +1,8 @@
+export type TaskFileContext = {
+  path: string;
+  content: string;
+};
+
 export type Task = {
   id: string;
   repo: string;
@@ -5,6 +10,7 @@ export type Task = {
   description: string;
   criteria?: string[];
   maxAttempts?: number;
+  files?: TaskFileContext[];
 };
 
 export type TaskState = 'pending' | 'running' | 'failed' | 'completed' | 'cancelled';

@@ -1,8 +1,10 @@
+import fs from 'fs';
+import path from 'path';
 import { runCycle } from './orchestrator';
 import { runTask } from './runner';
 import { writeReport } from './report';
 import type { AIProvider } from './providers/provider';
-import type { Task } from './types';
+import type { Task, TaskFileContext } from './types';
 
 export type WorkflowOptions = {
   dryRun?: boolean;
@@ -11,6 +13,37 @@ export type WorkflowOptions = {
   applyPatchesMode?: boolean;
   maxAttempts?: number;
 };
+
+const MAX_CONTEXT_FILE_SIZE_BYTES = 100 * 1024; // 100 KB por arquivo
+
+function loadSafeFileContext(repoRoot: string, relativePath: string): TaskFileContext | null {
+  try {
+    const resolvedRepo = path.resolve(repoRoot);
+    const resolvedPath = path.resolve(resolvedRepo, relativePath);
+
+    // Evita escape do repo (path traversal)
+    if (!resolvedPath.startsWith(resolvedRepo + path.sep) && resolvedPath !== resolvedRepo) {
+      return null;
+    }
+
+    if (!fs.existsSync(resolvedPath)) {
+      return null;
+    }
+
+    const stat = fs.statSync(resolvedPath);
+    if (!stat.isFile() || stat.size > MAX_CONTEXT_FILE_SIZE_BYTES) {
+      return null;
+    }
+
+    const content = fs.readFileSync(resolvedPath, 'utf8');
+    return {
+      path: relativePath,
+      content
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function runWorkflow(opts: WorkflowOptions = {}) {
   const result = await runCycle(opts);
@@ -33,13 +66,24 @@ export async function runWorkflow(opts: WorkflowOptions = {}) {
     process.env.ACA_APPLY_PATCHES === 'true';
 
   if (shouldExecutePatches && inspection && inspection.findings.length > 0) {
+    const uniqueFiles = Array.from(new Set(inspection.findings.map((f) => f.file)));
+    const filesContext: TaskFileContext[] = [];
+
+    for (const relPath of uniqueFiles) {
+      const fileCtx = loadSafeFileContext(repoRoot, relPath);
+      if (fileCtx) {
+        filesContext.push(fileCtx);
+      }
+    }
+
     const task: Task = {
       id: `task-wf-${Date.now()}`,
       repo: repoRoot,
       description: `Resolver ${inspection.findings.length} apontamentos encontrados:\n` +
         inspection.findings
           .map((f) => `- [${f.marker}] ${f.file}:${f.line} -> ${f.text}`)
-          .join('\n')
+          .join('\n'),
+      files: filesContext
     };
 
     const taskExecution = await runTask(task, {

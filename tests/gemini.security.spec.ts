@@ -45,6 +45,53 @@ describe('GeminiProvider', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  test('injeta contexto de arquivos no prompt quando task.files estiver presente', async () => {
+    let capturedBody = '';
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      capturedBody = String(init?.body ?? '');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [{
+            content: {
+              parts: [{
+                text: JSON.stringify({
+                  summary: 'Ajuste com contexto',
+                  patches: [{ path: 'src/app.ts', content: 'export const fixed = true;' }]
+                })
+              }]
+            }
+          }]
+        }),
+        text: async () => ''
+      } as Response;
+    });
+
+    const provider = new GeminiProvider(
+      'test-key',
+      'https://generativelanguage.googleapis.com',
+      fetchMock
+    );
+
+    const taskWithFiles: Task = {
+      ...task,
+      files: [
+        {
+          path: 'src/app.ts',
+          content: 'export const fixed = false;'
+        }
+      ]
+    };
+
+    const proposal = await provider.generateProposal(taskWithFiles);
+
+    expect(proposal.summary).toBe('Ajuste com contexto');
+    expect(capturedBody).toContain('=== Início de src/app.ts ===');
+    expect(capturedBody).toContain('export const fixed = false;');
+    expect(capturedBody).toContain('=== Fim de src/app.ts ===');
+  });
+
   test('rejeita JSON malformado', async () => {
     const provider = new GeminiProvider(
       'test-key',
@@ -65,7 +112,7 @@ describe('GeminiProvider', () => {
       '',
       'src/../outside.ts',
       'src/./outside.ts',
-      'src\\\\outside.ts'
+      'src\\outside.ts'
     ];
 
     for (const path of unsafePaths) {
