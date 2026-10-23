@@ -32,6 +32,35 @@ export type RunTaskResult = {
   error?: string;
 };
 
+type FileBackup = {
+  targetPath: string;
+  existed: boolean;
+  content?: string;
+};
+
+function createBackups(repoRoot: string, patchPaths: string[]): FileBackup[] {
+  return patchPaths.map((relPath) => {
+    const fullPath = path.resolve(repoRoot, relPath);
+    const exists = fs.existsSync(fullPath);
+    return {
+      targetPath: fullPath,
+      existed: exists,
+      content: exists ? fs.readFileSync(fullPath, 'utf8') : undefined
+    };
+  });
+}
+
+function restoreBackups(backups: FileBackup[]): void {
+  for (const backup of backups) {
+    if (backup.existed && backup.content !== undefined) {
+      fs.mkdirSync(path.dirname(backup.targetPath), { recursive: true });
+      fs.writeFileSync(backup.targetPath, backup.content, 'utf8');
+    } else if (!backup.existed && fs.existsSync(backup.targetPath)) {
+      fs.unlinkSync(backup.targetPath);
+    }
+  }
+}
+
 export async function runTask(
   taskInput: Task,
   repoRootOrOpts: string | RunTaskOptions = process.cwd()
@@ -83,6 +112,9 @@ export async function runTask(
       log: `Tentativa ${currentAttempt}/${maxAttempts} para a tarefa ${task.task.id}`
     });
 
+    let backups: FileBackup[] = [];
+    let appliedThisAttempt = 0;
+
     try {
       const taskForAttempt: Task = lastError
         ? {
@@ -95,21 +127,28 @@ export async function runTask(
       latestSummary = proposal.summary;
 
       const shouldApply = !opts.dryRun && proposal.patches.length > 0;
-      let appliedCount = 0;
 
       if (shouldApply) {
+        backups = createBackups(
+          normalizedRoot,
+          proposal.patches.map((p) => p.path)
+        );
         const patchResult = applyPatches(normalizedRoot, proposal.patches);
-        appliedCount = patchResult.applied;
-        totalApplied += appliedCount;
+        appliedThisAttempt = patchResult.applied;
       }
 
       if (opts.verify) {
         const verifyOutcome = await opts.verify(normalizedRoot);
         if (!verifyOutcome.ok) {
+          if (backups.length > 0) {
+            restoreBackups(backups);
+          }
           lastError = verifyOutcome.error ?? 'Verificacao falhou sem mensagem detalhada.';
           continue;
         }
       }
+
+      totalApplied += appliedThisAttempt;
 
       const updatedTask = updateTaskState(task.task.id, {
         state: 'completed',
@@ -126,6 +165,9 @@ export async function runTask(
         repoRoot: normalizedRoot
       };
     } catch (err) {
+      if (backups.length > 0) {
+        restoreBackups(backups);
+      }
       lastError = err instanceof Error ? err.message : String(err);
     }
   }

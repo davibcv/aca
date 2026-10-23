@@ -6,6 +6,13 @@ export type Patch = {
   content: string;
 };
 
+export type ApplyPatchesOptions = {
+  allowEmpty?: boolean;
+  maxShrinkRatio?: number;
+};
+
+const DEFAULT_MAX_SHRINK_RATIO = 0.5;
+
 function resolveSafePath(root: string, relativePath: string): string {
   if (
     !relativePath.trim() ||
@@ -38,25 +45,53 @@ function resolveSafePath(root: string, relativePath: string): string {
   return target;
 }
 
-export function applyPatches(repoRoot: string, patches: Patch[]) {
+export function applyPatches(
+  repoRoot: string,
+  patches: Patch[],
+  opts: ApplyPatchesOptions = {}
+) {
   if (!Array.isArray(patches)) throw new Error('Patches must be an array.');
   const root = fs.realpathSync(path.resolve(repoRoot));
   const seen = new Set<string>();
+  const maxShrinkRatio = opts.maxShrinkRatio ?? DEFAULT_MAX_SHRINK_RATIO;
 
-  // Valida todos os caminhos antes de escrever qualquer arquivo.
+  // Pré-validação estrutural, de segurança e integridade
   const targets = patches.map((patch) => {
-    if (!patch || typeof patch.path !== 'string' || typeof patch.content !== 'string') throw new Error('Invalid patch structure.');
+    if (!patch || typeof patch.path !== 'string' || typeof patch.content !== 'string') {
+      throw new Error('Invalid patch structure.');
+    }
+
+    if (!opts.allowEmpty && patch.content.trim().length === 0) {
+      throw new Error(`[Integridade] Patch vazio rejeitado para: ${patch.path}`);
+    }
+
     const target = resolveSafePath(root, patch.path);
     if (seen.has(target)) throw new Error('Duplicate patch target.');
     seen.add(target);
-    if (fs.existsSync(target) && !fs.lstatSync(target).isFile()) throw new Error('Patch target is not a regular file.');
+
+    if (fs.existsSync(target)) {
+      if (!fs.lstatSync(target).isFile()) {
+        throw new Error('Patch target is not a regular file.');
+      }
+
+      const existingSize = fs.statSync(target).size;
+      const newSize = Buffer.byteLength(patch.content, 'utf8');
+
+      // Protege contra amputação acidental se o arquivo original for relevante (> 100 bytes)
+      if (existingSize > 100 && newSize < existingSize * maxShrinkRatio) {
+        throw new Error(
+          `[Integridade] Redução excessiva de conteúdo detectada em ${patch.path} ` +
+          `(original: ${existingSize} bytes, novo: ${newSize} bytes).`
+        );
+      }
+    }
+
     return { target, content: patch.content };
   });
 
   for (const { target, content } of targets) {
     fs.mkdirSync(path.dirname(target), { recursive: true });
 
-    // Revalida após criar diretórios, antes de escrever.
     resolveSafePath(root, path.relative(root, target));
     const exists = fs.existsSync(target);
     if (exists && !fs.lstatSync(target).isFile()) throw new Error('Unsafe patch target.');

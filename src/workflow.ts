@@ -3,6 +3,7 @@ import path from 'path';
 import { runCycle } from './orchestrator';
 import { runTask } from './runner';
 import { writeReport } from './report';
+import { getGitStatus } from './git';
 import type { AIProvider } from './providers/provider';
 import type { Task, TaskFileContext } from './types';
 
@@ -12,9 +13,14 @@ export type WorkflowOptions = {
   provider?: AIProvider;
   applyPatchesMode?: boolean;
   maxAttempts?: number;
+  maxContextFiles?: number;
+  maxTotalContextBytes?: number;
+  allowDirtyWorktree?: boolean;
 };
 
 const MAX_CONTEXT_FILE_SIZE_BYTES = 100 * 1024; // 100 KB por arquivo
+const DEFAULT_MAX_CONTEXT_FILES = 5;
+const DEFAULT_MAX_TOTAL_CONTEXT_BYTES = 250 * 1024; // 250 KB total
 
 function loadSafeFileContext(repoRoot: string, relativePath: string): TaskFileContext | null {
   try {
@@ -46,8 +52,33 @@ function loadSafeFileContext(repoRoot: string, relativePath: string): TaskFileCo
 }
 
 export async function runWorkflow(opts: WorkflowOptions = {}) {
-  const result = await runCycle(opts);
   const repoRoot = opts.repoRoot ?? process.cwd();
+
+  const shouldExecutePatches =
+    Boolean(opts.applyPatchesMode) ||
+    process.env.ACA_APPLY_PATCHES === '1' ||
+    process.env.ACA_APPLY_PATCHES === 'true';
+
+  const isLivePatch = shouldExecutePatches && !opts.dryRun;
+
+  if (isLivePatch && !opts.allowDirtyWorktree) {
+    try {
+      const gitStatus = getGitStatus(repoRoot);
+      if (gitStatus.trim().length > 0) {
+        throw new Error(
+          `[Segurança] Repositório contém modificações não commitadas. ` +
+          `A execução autônoma requer a árvore de trabalho limpa.`
+        );
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('[Segurança]')) {
+        throw err;
+      }
+      // Se não for um repositório git ou o comando falhar, continua permitindo execução
+    }
+  }
+
+  const result = await runCycle(opts);
   const inspection = result.inspection;
 
   let executionResult:
@@ -60,19 +91,41 @@ export async function runWorkflow(opts: WorkflowOptions = {}) {
       }
     | undefined;
 
-  const shouldExecutePatches =
-    Boolean(opts.applyPatchesMode) ||
-    process.env.ACA_APPLY_PATCHES === '1' ||
-    process.env.ACA_APPLY_PATCHES === 'true';
-
   if (shouldExecutePatches && inspection && inspection.findings.length > 0) {
-    const uniqueFiles = Array.from(new Set(inspection.findings.map((f) => f.file)));
+    const maxFiles = opts.maxContextFiles ?? DEFAULT_MAX_CONTEXT_FILES;
+    const maxTotalBytes = opts.maxTotalContextBytes ?? DEFAULT_MAX_TOTAL_CONTEXT_BYTES;
+
+    // Prioriza arquivos com achados de maior severidade (medium > low)
+    const severityRank: Record<string, number> = { medium: 2, low: 1 };
+    const findingsSorted = [...inspection.findings].sort((a, b) => {
+      const rankA = severityRank[a.severity] ?? 0;
+      const rankB = severityRank[b.severity] ?? 0;
+      return rankB - rankA;
+    });
+
+    const uniqueFiles: string[] = [];
+    for (const f of findingsSorted) {
+      if (!uniqueFiles.includes(f.file)) {
+        uniqueFiles.push(f.file);
+      }
+    }
+
     const filesContext: TaskFileContext[] = [];
+    let currentTotalBytes = 0;
 
     for (const relPath of uniqueFiles) {
+      if (filesContext.length >= maxFiles) {
+        break;
+      }
+
       const fileCtx = loadSafeFileContext(repoRoot, relPath);
       if (fileCtx) {
+        const fileBytes = Buffer.byteLength(fileCtx.content, 'utf8');
+        if (currentTotalBytes + fileBytes > maxTotalBytes && filesContext.length > 0) {
+          continue;
+        }
         filesContext.push(fileCtx);
+        currentTotalBytes += fileBytes;
       }
     }
 

@@ -48,3 +48,28 @@ describe('applyPatches pre-validation and isolation', () => {
     expect(fs.readFileSync(path.join(root, 'existing.txt'), 'utf8')).toBe('clean');
   });
 });
+
+describe('applyPatches content integrity traps', () => {
+  test('rejects empty content patch by default without modifying target', () => {
+    const root = createRoot();
+    fs.writeFileSync(path.join(root, 'target.ts'), 'export const a = 1;');
+
+    expect(() =>
+      applyPatches(root, [{ path: 'target.ts', content: '   \n  ' }])
+    ).toThrow(/Patch vazio rejeitado/);
+
+    expect(fs.readFileSync(path.join(root, 'target.ts'), 'utf8')).toBe('export const a = 1;');
+  });
+
+  test('rejects catastrophic shrink in existing files', () => {
+    const root = createRoot();
+    const substantialContent = 'export function calculate() {\n' + '  const x = 10;\n'.repeat(20) + '  return x;\n}\n';
+    fs.writeFileSync(path.join(root, 'math.ts'), substantialContent);
+
+    expect(() =>
+      applyPatches(root, [{ path: 'math.ts', content: 'export const x = 1;\n' }])
+    ).toThrow(/Redução excessiva de conteúdo detectada/);
+
+    expect(fs.readFileSync(path.join(root, 'math.ts'), 'utf8')).toBe(substantialContent);
+  });
+});

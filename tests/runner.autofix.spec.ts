@@ -80,3 +80,69 @@ describe('runTask auto-fix and verify loop', () => {
     expect(result.task.state).toBe('completed');
   });
 });
+
+  test('restaura estado original dos arquivos se a verificacao falhar e esgotar tentativas', async () => {
+    const root = createTempDir('aca-rollback-repo-');
+    process.env.ACA_STATE_DIR = createTempDir('aca-rollback-state-');
+
+    const originalFile = path.join(root, 'app.ts');
+    fs.writeFileSync(originalFile, 'export const initial = true;\n', 'utf8');
+
+    const failingProvider: AIProvider = {
+      async generateProposal(_t: Task): Promise<Proposal> {
+        return {
+          summary: 'Tentativa que quebra sintaxe',
+          patches: [{ path: 'app.ts', content: 'export const broken = ;' }]
+        };
+      }
+    };
+
+    const task: Task = {
+      id: 'task-rollback-exhausted',
+      repo: root,
+      description: 'Testar rollback ao esgotar tentativas'
+    };
+
+    const result = await runTask(task, {
+      repoRoot: root,
+      provider: failingProvider,
+      verify: () => ({ ok: false, error: 'Sintaxe TypeScript invalida' }),
+      maxAttempts: 2
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.task.state).toBe('failed');
+    expect(fs.readFileSync(originalFile, 'utf8')).toBe('export const initial = true;\n');
+  });
+
+  test('remove arquivo criado pelo patch se a verificacao falhar', async () => {
+    const root = createTempDir('aca-rollback-newfile-repo-');
+    process.env.ACA_STATE_DIR = createTempDir('aca-rollback-newfile-state-');
+
+    const newFilePath = path.join(root, 'created.ts');
+
+    const failingProvider: AIProvider = {
+      async generateProposal(_t: Task): Promise<Proposal> {
+        return {
+          summary: 'Criando arquivo invalido',
+          patches: [{ path: 'created.ts', content: 'export const bad = true;' }]
+        };
+      }
+    };
+
+    const task: Task = {
+      id: 'task-rollback-newfile',
+      repo: root,
+      description: 'Testar remocao de arquivo novo no rollback'
+    };
+
+    const result = await runTask(task, {
+      repoRoot: root,
+      provider: failingProvider,
+      verify: () => ({ ok: false, error: 'Rejeitado por teste' }),
+      maxAttempts: 1
+    });
+
+    expect(result.ok).toBe(false);
+    expect(fs.existsSync(newFilePath)).toBe(false);
+  });
