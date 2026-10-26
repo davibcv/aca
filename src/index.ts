@@ -1,5 +1,6 @@
 import { readConfig } from './config';
 import { runWorkflow } from './workflow';
+import { createCommandVerifier } from './verifier';
 
 async function main() {
   const config = readConfig();
@@ -8,6 +9,9 @@ async function main() {
     process.env.ACA_DRY_RUN === '1' ||
     process.env.ACA_DRY_RUN === 'true';
 
+  const verifyCmd = process.env.ACA_VERIFY_CMD;
+  const verify = verifyCmd ? createCommandVerifier(verifyCmd) : undefined;
+
   const applyPatches =
     process.env.ACA_APPLY_PATCHES === '1' ||
     process.env.ACA_APPLY_PATCHES === 'true';
@@ -15,7 +19,8 @@ async function main() {
   const result = await runWorkflow({
     dryRun: dry,
     applyPatchesMode: applyPatches,
-    repoRoot: config.repoRoot
+    repoRoot: config.repoRoot,
+    verify
   });
 
   console.log(

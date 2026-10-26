@@ -14,15 +14,19 @@ async function main() {
   }
 
   const { runWorkflow } = require(path.join(repo, 'dist', 'workflow.js'));
+  const { createCommandVerifier } = require(path.join(repo, 'dist', 'verifier.js'));
 
   const dry = process.env.ACA_DRY_RUN !== '0' && process.env.ACA_DRY_RUN !== 'false';
   const applyPatches = process.env.ACA_APPLY_PATCHES === '1' || process.env.ACA_APPLY_PATCHES === 'true';
+  const verifyCmd = process.env.ACA_VERIFY_CMD;
+  const verify = verifyCmd ? createCommandVerifier(verifyCmd) : undefined;
 
   try {
     const result = await runWorkflow({
       repoRoot: repo,
       dryRun: dry,
-      applyPatchesMode: applyPatches
+      applyPatchesMode: applyPatches,
+      verify
     });
 
     console.log(
