@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { runCycle } from './orchestrator';
-import { runTask } from './runner';
+import { runTask, type VerifyFn } from './runner';
 import { writeReport } from './report';
 import { getGitStatus } from './git';
 import type { AIProvider } from './providers/provider';
@@ -16,6 +16,7 @@ export type WorkflowOptions = {
   maxContextFiles?: number;
   maxTotalContextBytes?: number;
   allowDirtyWorktree?: boolean;
+  verify?: VerifyFn;
 };
 
 const MAX_CONTEXT_FILE_SIZE_BYTES = 100 * 1024; // 100 KB por arquivo
@@ -143,6 +144,7 @@ export async function runWorkflow(opts: WorkflowOptions = {}) {
       repoRoot,
       provider: opts.provider,
       dryRun: Boolean(opts.dryRun),
+      verify: opts.verify,
       maxAttempts: opts.maxAttempts ?? 3
     });
 

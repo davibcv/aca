@@ -122,3 +122,14 @@ describe('workflow patch mode execution', () => {
       })
     ).rejects.toThrow(/Repositório contém modificações não commitadas/);
   });
+
+test("repassa verify para o runner e valida sucesso", async () => {
+  const root = await createTempRepo();
+  process.env.ACA_STATE_DIR = path.join(root, ".aca_state");
+  await fs.writeFile(path.join(root, "src", "app.ts"), "// TODO: fix\nconst x = 1;\n", "utf8");
+  const provider = new MockProvider({ summary: "ok", patches: [{ path: "src/app.ts", content: "const x = 2;\n" }] });
+  let called = false;
+  const res = await runWorkflow({ repoRoot: root, applyPatchesMode: true, provider, verify: async () => { called = true; return { ok: true }; } });
+  expect(res.ok).toBe(true);
+  expect(called).toBe(true);
+});
