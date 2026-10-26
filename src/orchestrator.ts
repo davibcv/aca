@@ -32,7 +32,8 @@ const IGNORED_DIRECTORIES = new Set([
   'dist',
   'coverage',
   '.aca_reports',
-  '.aca_state'
+  '.aca_state',
+  'tests'
 ]);
 
 const TEXT_EXTENSIONS = new Set([
